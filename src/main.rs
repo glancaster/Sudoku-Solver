@@ -14,6 +14,7 @@ fn main() {
 #[derive(Default)]
 struct SudokuSolverApp {
     board: [[usize; 9]; 9],
+    solution: [[usize; 9]; 9],
     difficulty: String,
 }
 
@@ -41,10 +42,18 @@ struct BoardResponse {
     difficulty: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct HttpYouDoSudokuResponse {
+    difficulty: String, 
+    puzzle: String,
+    solution: String,
+}
+
+
 impl eframe::App for SudokuSolverApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::SidePanel::left("left_panel").show(ctx, |ui| {
-            if ui.button("Get Random Board (Dosuku API)").clicked() {
+            if ui.button("Get Random Board\n(Dosuku API)").clicked() {
                 // Dosuku only has the ability to query the number of boards to request.
                 // If a specific difficulty is requested then more time would be spent cycling 
                 // requests until desired difficulty is requested.
@@ -60,10 +69,34 @@ impl eframe::App for SudokuSolverApp {
                 self.board = response.newboard.grids[0].value;
                 self.difficulty = response.newboard.grids[0].difficulty.clone();
             }
+            if ui.button("Get Random Board\n(YouDoSudoku API)").clicked() {
+                let response: HttpYouDoSudokuResponse = get("https://you-do-sudoku-api.vercel.app/api")
+                    .unwrap()
+                    .json()
+                    .unwrap();
+                println!("{:#?}", response);
+
+                // Since YouDoSudoku encodes their puzzles as a single String with 81 characters,
+                // we will have to do some manual parsing which we can take the chars ascii equivalent since its just numbers. 
+                // They do have support for arrays but i'll 
+                // explore that in the future.
+                for (i,c) in response.puzzle.chars().enumerate() {
+                    let row = i / 9 as usize;
+                    let col = i % 9 as usize;
+                    self.board[row][col] = c as usize - '0' as usize;
+                }
+                for (i,c) in response.solution.chars().enumerate() {
+                    let row = i / 9 as usize;
+                    let col = i % 9 as usize;
+                    self.solution[row][col] = c as usize - '0' as usize;
+                }
+                self.difficulty = response.difficulty;
+            }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("Difficulty: {}", self.difficulty));
+                if self.board == self.solution && self.solution[0][0] != 0 { ui.label("Won"); }
             });
 
             ui.group(|ui| {
