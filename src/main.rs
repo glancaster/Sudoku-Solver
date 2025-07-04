@@ -1,6 +1,6 @@
 use eframe::egui;
-use reqwest::blocking::get;
-use serde::Deserialize;
+use reqwest::blocking::{get, Client};
+use serde::{Serialize, Deserialize};
 
 fn main() {
     let native_options = eframe::NativeOptions::default();
@@ -26,6 +26,36 @@ impl SudokuSolverApp {
             ..Default::default()
         }
     }
+    fn get_board_yds(&mut self, difficulty: String) {
+        let client = Client::new();
+        let request_body = HttpYouDoSudokuRequest {
+            difficulty,
+            solution: true,
+            array: false,
+        };
+        let response: HttpYouDoSudokuResponse = client.post("https://youdosudoku.com/api")
+            .json(&request_body)
+            .send().unwrap().json().unwrap();
+
+        //println!("{:#?}", response);
+
+        // Since YouDoSudoku encodes their puzzles as a single String with 81 characters,
+        // we will have to do some manual parsing which we can take the chars ascii equivalent since its just numbers.
+        // They do have support for arrays but i'll
+        // explore that in the future.
+        for (i, c) in response.puzzle.chars().enumerate() {
+            let row = i / 9 as usize;
+            let col = i % 9 as usize;
+            self.puzzle[row][col] = c as usize - '0' as usize;
+        }
+        for (i, c) in response.solution.chars().enumerate() {
+            let row = i / 9 as usize;
+            let col = i % 9 as usize;
+            self.solution[row][col] = c as usize - '0' as usize;
+        }
+        self.difficulty = response.difficulty;
+        self.board = self.puzzle;
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +75,12 @@ struct BoardResponse {
     difficulty: String,
 }
 
+#[derive(Debug, Serialize)]
+struct HttpYouDoSudokuRequest {
+    difficulty: String,
+    solution: bool,
+    array: bool,
+}
 #[derive(Debug, Deserialize)]
 struct HttpYouDoSudokuResponse {
     difficulty: String,
@@ -96,6 +132,15 @@ impl eframe::App for SudokuSolverApp {
                 }
                 self.difficulty = response.difficulty;
                 self.board = self.puzzle;
+            }
+            if ui.button("Easy Board\n(YouDoSudoku API)").clicked() {
+                self.get_board_yds("easy".into());
+            }
+            if ui.button("Medium Board\n(YouDoSudoku API)").clicked() {
+                self.get_board_yds("medium".into());
+            }
+            if ui.button("Hard Board\n(YouDoSudoku API)").clicked() {
+                self.get_board_yds("hard".into());
             }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
