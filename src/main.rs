@@ -1,6 +1,8 @@
 use eframe::egui;
 use reqwest::blocking::{get, Client};
 use serde::{Serialize, Deserialize};
+use std::sync::{Arc,Mutex};
+use std::thread;
 
 fn main() {
     let native_options = eframe::NativeOptions::default();
@@ -13,7 +15,7 @@ fn main() {
 
 #[derive(Default)]
 struct SudokuSolverApp {
-    board: [[usize; 9]; 9],
+    board: Arc<Mutex<[[usize; 9]; 9]>>,
     puzzle: [[usize; 9]; 9],
     solution: [[usize; 9]; 9],
     difficulty: String,
@@ -22,7 +24,7 @@ struct SudokuSolverApp {
 impl SudokuSolverApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Self {
-            board: [[0; 9]; 9],
+            board: Arc::new(Mutex::new([[0; 9]; 9])),
             ..Default::default()
         }
     }
@@ -54,7 +56,59 @@ impl SudokuSolverApp {
             self.solution[row][col] = c as usize - '0' as usize;
         }
         self.difficulty = response.difficulty;
-        self.board = self.puzzle;
+        *self.board.lock().unwrap() = self.puzzle;
+    }
+    fn brute_force(&mut self, ctx: &egui::Context) {
+        let board = self.board.clone();
+        let puzzle = self.puzzle.clone();
+        thread::spawn(move || {
+            let mut i = 0;
+            let mut dir = 1;
+            while i < 81 {
+                let row = i / 9 as usize;
+                let col = i % 9 as usize;
+                let cell_row = row / 3 as usize;
+                let cell_col = col / 3 as usize;
+                println!("element {i} cell row {cell_row} cell col {cell_col}");
+                
+                if puzzle[row][col] == 0 {
+                    loop {
+                        //thread::sleep(std::time::Duration::from_millis(20));
+                        let mut b = {
+                            board.lock().unwrap()
+                        };
+                        b[row][col] += 1;
+                        let digit = b[row][col];
+                        println!("{digit}");
+                        if digit == 10 {
+                            b[row][col] = 0;
+                            i -= 1;
+                            dir = -1;
+                            break;
+                        }
+                        let col_check = b.iter().map(|r| r[col] ).filter(|&e| e == b[row][col]).collect::<Vec<_>>().len();
+                        let row_check = b[row].iter().filter(|&e| e == &b[row][col]).collect::<Vec<_>>().len();
+                        let cr = cell_row*3;
+                        let cc = cell_col*3;
+                        let cell_check = b[cr..cr+3].iter().flat_map(|r| r[cc..cc+3].iter().collect::<Vec<_>>()).filter(|&e| e == &b[row][col]).collect::<Vec<_>>().len();
+                        println!("COL {:?} {}", b.iter().map(|r| r[col]).collect::<Vec<_>>(), col_check);
+                        println!("ROW {:?} {}", b[row], row_check);
+                        println!("CELL {:?} {}", b[cr..cr+3].iter().flat_map(|r| r[cc..cc+3].iter().collect::<Vec<_>>()).collect::<Vec<_>>(), cell_check);
+
+
+                        if row_check == 1 && col_check == 1 && cell_check == 1{
+                            i += 1;
+                            dir = 1;
+                            break;
+                        }
+                    }
+                } else {
+                    if i == 0 { dir = 1; }
+                    if dir == 1 { i += 1; } else if dir == -1 { i -= 1; }
+                }
+            }
+            println!("Solved?");
+        });
     }
 }
 
@@ -105,7 +159,7 @@ impl eframe::App for SudokuSolverApp {
                     .unwrap();
                 //println!("{:#?}", response.newboard.grids[0].value);
                 self.puzzle = response.newboard.grids[0].value;
-                self.board = self.puzzle;
+                *self.board.lock().unwrap() = self.puzzle;
                 self.difficulty = response.newboard.grids[0].difficulty.clone();
             }
             if ui.button("Get Random Board\n(YouDoSudoku API)").clicked() {
@@ -131,7 +185,7 @@ impl eframe::App for SudokuSolverApp {
                     self.solution[row][col] = c as usize - '0' as usize;
                 }
                 self.difficulty = response.difficulty;
-                self.board = self.puzzle;
+                *self.board.lock().unwrap() = self.puzzle;
             }
             if ui.button("Easy Board\n(YouDoSudoku API)").clicked() {
                 self.get_board_yds("easy".into());
@@ -142,14 +196,18 @@ impl eframe::App for SudokuSolverApp {
             if ui.button("Hard Board\n(YouDoSudoku API)").clicked() {
                 self.get_board_yds("hard".into());
             }
+            ui.separator();
+            if ui.button("Brute Force").clicked() {
+                self.brute_force(&ctx);
+            }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Reset").clicked() {
-                    self.board = self.puzzle;
+                    *self.board.lock().unwrap() = self.puzzle;
                 }
                 ui.label(format!("Difficulty: {}", self.difficulty));
-                if self.board == self.solution && self.solution[0][0] != 0 {
+                if *self.board.lock().unwrap() == self.solution && self.solution[0][0] != 0 {
                     ui.label("Won");
                 }
             });
@@ -159,7 +217,7 @@ impl eframe::App for SudokuSolverApp {
                 for i in 0..9 {
                     ui.horizontal(|ui| {
                         for j in 0..9 {
-                            let digit = self.board[i][j];
+                            let digit = self.board.lock().unwrap()[i][j];
                             let puzzle_digit = self.puzzle[i][j];
                             let solution_digit = self.solution[i][j];
                             let cell = egui::Button::new(if digit != 0 {
@@ -187,7 +245,7 @@ impl eframe::App for SudokuSolverApp {
                                         egui::Grid::new("some_unique_id").show(ui, |ui| {
                                             for n in 1..10 {
                                                 if ui.button(format!("\t{n}\t")).clicked() {
-                                                    self.board[i][j] = n;
+                                                    self.board.lock().unwrap()[i][j] = n;
                                                 }
                                                 if n % 3 == 0 {
                                                     ui.end_row();
@@ -207,5 +265,6 @@ impl eframe::App for SudokuSolverApp {
                 }
             });
         });
+        ctx.request_repaint();
     }
 }
