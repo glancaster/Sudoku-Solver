@@ -56,7 +56,11 @@ impl SudokuSolverApp {
             let col = i % 9 as usize;
             let digit = c as usize - '0' as usize;
             self.puzzle[row][col] = digit;
-            self.potentials[row][col] = if digit>0 { 1 << (digit - 1) } else {0b111111111};
+            self.potentials[row][col] = if digit > 0 {
+                1 << (digit - 1)
+            } else {
+                0b111111111
+            };
         }
         for (i, c) in response.solution.chars().enumerate() {
             let row = i / 9 as usize;
@@ -151,18 +155,15 @@ impl SudokuSolverApp {
                     .map(|r| r[col])
                     .filter(|&e| e != 0)
                     .collect::<Vec<_>>();
-                    
+
                 //println!("{col_check:?}");
                 for num in col_check {
-                    self.potentials[row][col] &= !( 1 << (num-1));
+                    self.potentials[row][col] &= !(1 << (num - 1));
                 }
-                let row_check = board[row]
-                    .iter()
-                    .filter(|&e| *e != 0)
-                    .collect::<Vec<_>>();
+                let row_check = board[row].iter().filter(|&e| *e != 0).collect::<Vec<_>>();
                 //println!("{row_check:?}");
                 for num in row_check {
-                    self.potentials[row][col] &= !( 1 << (num-1));
+                    self.potentials[row][col] &= !(1 << (num - 1));
                 }
                 let cr = cell_row * 3;
                 let cc = cell_col * 3;
@@ -173,10 +174,10 @@ impl SudokuSolverApp {
                     .collect::<Vec<_>>();
                 //println!("{cell_check:?}");
                 for num in cell_check {
-                    self.potentials[row][col] &= !( 1 << (num-1));
+                    self.potentials[row][col] &= !(1 << (num - 1));
                 }
             }
-            i+=1;
+            i += 1;
         }
         println!("Updated Potentials");
     }
@@ -297,58 +298,58 @@ impl eframe::App for SudokuSolverApp {
                             let puzzle_digit = self.puzzle[i][j];
                             let solution_digit = self.solution[i][j];
                             let potential = self.potentials[i][j];
-                            let cell = egui::Button::new(if digit != 0 {
-                                digit.to_string()
-                            } else {
-                                // TODO: Is there a better way to do this?
-                                if self.show_potentials {
-                                    let fmt = format!(
-                                        "{} {} {}\n{} {} {}\n{} {} {}",
-                                        (potential & (1 << 0) == (1 << 0)) as usize *1,
-                                        (potential & (1 << 1) == (1 << 1)) as usize *2,
-                                        (potential & (1 << 2) == (1 << 2)) as usize *3,
-                                        (potential & (1 << 3) == (1 << 3)) as usize *4,
-                                        (potential & (1 << 4) == (1 << 4)) as usize *5,
-                                        (potential & (1 << 5) == (1 << 5)) as usize *6,
-                                        (potential & (1 << 6) == (1 << 6)) as usize *7,
-                                        (potential & (1 << 7) == (1 << 7)) as usize *8,
-                                        (potential & (1 << 8) == (1 << 8)) as usize *9,
-                                    );
-                                    fmt
-                                } else {
-                                    "".to_string()
-                                }
-                            });
                             // Disable the cells that belong in the puzzle
-                            ui.add_enabled_ui(puzzle_digit == 0, |ui| {
-                                let popup_id = ui.make_persistent_id(format!("{i}{j}"));
-                                let response = ui.add_sized(egui::Vec2::splat(cell_size), cell);
-                                if response.clicked() {
-                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                                }
-                                let below = egui::AboveOrBelow::Below;
-                                let close_on_click_outside =
-                                    egui::popup::PopupCloseBehavior::CloseOnClick;
-                                egui::popup::popup_above_or_below_widget(
-                                    ui,
-                                    popup_id,
-                                    &response,
-                                    below,
-                                    close_on_click_outside,
-                                    |ui| {
-                                        egui::Grid::new("some_unique_id").show(ui, |ui| {
-                                            for n in 0..10 {
-                                                if ui.button(format!("\t{n}\t")).clicked() {
-                                                    self.board.lock().unwrap()[i][j] = n;
-                                                }
-                                                if n == 0 { ui.end_row(); continue;}
-                                                if n % 3 == 0 {
-                                                    ui.end_row();
-                                                }
+                            let mut uib = egui::UiBuilder{
+                                disabled: puzzle_digit != 0,
+                                ..Default::default()
+                            };
+                            ui.scope_builder(uib, |ui| {
+                            //ui.add_enabled_ui(puzzle_digit == 0, |ui| {
+                                //ui.add_sized([cell_size, cell_size], 
+                                ui.vertical(|ui| {
+                                    for y in 0..3 {
+                                        ui.horizontal(|ui| {
+                                            for x in 0..3 {
+                                                let n = x + y * 3;
+                                                let p = (potential & (1 << n) == (1 << n)) as usize
+                                                    * (n + 1);
+                                                ui.add_visible(
+                                                    p != 0,
+                                                    egui::Label::new(format!("{}", p)),
+                                                );
                                             }
                                         });
-                                    },
-                                );
+                                    }
+                                });
+
+                                //let popup_id = ui.make_persistent_id(format!("{i}{j}"));
+                                //let response = ui.add_sized(egui::Vec2::splat(cell_size), cell);
+                                //if response.clicked() {
+                                //    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                //}
+                                //let below = egui::AboveOrBelow::Below;
+                                //let close_on_click_outside =
+                                //egui::popup::PopupCloseBehavior::CloseOnClick;
+                                //egui::popup::popup_above_or_below_widget(
+                                //    ui,
+                                //    popup_id,
+                                //    &response,
+                                //    below,
+                                //    close_on_click_outside,
+                                //    |ui| {
+                                //        egui::Grid::new("some_unique_id").show(ui, |ui| {
+                                //            for n in 0..10 {
+                                //                if ui.button(format!("\t{n}\t")).clicked() {
+                                //                    self.board.lock().unwrap()[i][j] = n;
+                                //                }
+                                //                if n == 0 { ui.end_row(); continue;}
+                                //                if n % 3 == 0 {
+                                //                    ui.end_row();
+                                //                }
+                                //            }
+                                //        });
+                                //    },
+                                //);
                             });
                             if (j + 1) % 3 == 0 && j != 8 {
                                 ui.separator();
