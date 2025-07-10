@@ -21,12 +21,23 @@ struct SudokuSolverApp {
     difficulty: String,
     show_potentials: bool,
     potentials: [[u16; 9]; 9],
+    // Settings
+    cell_size: f32,
+    cell_color: egui::Color32,
+    grid_dist: f32,
+    digit_font_size: f32,
+    grid_font_size: f32,
 }
 
 impl SudokuSolverApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             board: Arc::new(Mutex::new([[0; 9]; 9])),
+            cell_size: 60.0,
+            cell_color: egui::Color32::from_rgb(50, 100, 150),
+            grid_dist: 18.0,
+            digit_font_size: 47.0,
+            grid_font_size: 19.0,
             ..Default::default()
         }
     }
@@ -276,6 +287,12 @@ impl eframe::App for SudokuSolverApp {
             if ui.button("Update Potentials").clicked() {
                 self.update_potentials();
             }
+            ui.add(egui::DragValue::new(&mut self.cell_size));
+            ui.add(egui::DragValue::new(&mut self.grid_dist));
+            ui.add(egui::DragValue::new(&mut self.digit_font_size));
+            ui.add(egui::DragValue::new(&mut self.grid_font_size));
+            
+            egui::widgets::color_picker::color_picker_color32(ui, &mut self.cell_color, egui::widgets::color_picker::Alpha::Opaque);  
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -290,7 +307,8 @@ impl eframe::App for SudokuSolverApp {
             });
 
             ui.group(|ui| {
-                let cell_size = ui.available_width().min(ui.available_height()) / 11.0;
+                ui.spacing_mut().item_spacing = egui::Vec2::splat(1.0);
+                //let cell_size = ui.available_width().min(ui.available_height()) / 11.0;
                 for i in 0..9 {
                     ui.horizontal(|ui| {
                         for j in 0..9 {
@@ -298,59 +316,78 @@ impl eframe::App for SudokuSolverApp {
                             let puzzle_digit = self.puzzle[i][j];
                             let solution_digit = self.solution[i][j];
                             let potential = self.potentials[i][j];
-                            // Disable the cells that belong in the puzzle
-                            let mut uib = egui::UiBuilder{
-                                disabled: puzzle_digit != 0,
-                                ..Default::default()
-                            };
-                            ui.scope_builder(uib, |ui| {
-                            //ui.add_enabled_ui(puzzle_digit == 0, |ui| {
-                                //ui.add_sized([cell_size, cell_size], 
-                                ui.vertical(|ui| {
-                                    for y in 0..3 {
-                                        ui.horizontal(|ui| {
-                                            for x in 0..3 {
-                                                let n = x + y * 3;
-                                                let p = (potential & (1 << n) == (1 << n)) as usize
-                                                    * (n + 1);
-                                                ui.add_visible(
-                                                    p != 0,
-                                                    egui::Label::new(format!("{}", p)),
-                                                );
-                                            }
-                                        });
-                                    }
-                                });
 
-                                //let popup_id = ui.make_persistent_id(format!("{i}{j}"));
-                                //let response = ui.add_sized(egui::Vec2::splat(cell_size), cell);
-                                //if response.clicked() {
-                                //    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                                //}
-                                //let below = egui::AboveOrBelow::Below;
-                                //let close_on_click_outside =
-                                //egui::popup::PopupCloseBehavior::CloseOnClick;
-                                //egui::popup::popup_above_or_below_widget(
-                                //    ui,
-                                //    popup_id,
-                                //    &response,
-                                //    below,
-                                //    close_on_click_outside,
-                                //    |ui| {
-                                //        egui::Grid::new("some_unique_id").show(ui, |ui| {
-                                //            for n in 0..10 {
-                                //                if ui.button(format!("\t{n}\t")).clicked() {
-                                //                    self.board.lock().unwrap()[i][j] = n;
-                                //                }
-                                //                if n == 0 { ui.end_row(); continue;}
-                                //                if n % 3 == 0 {
-                                //                    ui.end_row();
-                                //                }
-                                //            }
-                                //        });
-                                //    },
-                                //);
-                            });
+                            let rect_size = egui::Vec2::splat(self.cell_size);
+                            let (rect, response) = ui.allocate_exact_size(rect_size, egui::Sense::click());
+
+                            let painter = ui.painter();
+
+                            {
+                                painter.rect_filled(
+                                    rect,
+                                    egui::Rounding::same(5),
+                                    self.cell_color,
+                                    //egui::Color32::from_rgb(50, 100, 150),
+                                );
+
+                            }
+                            if digit > 0 {
+                                {
+                                    painter.text(
+                                        rect.center(),
+                                        egui::Align2::CENTER_CENTER,
+                                        format!("{}", digit),
+                                        egui::FontId::new(self.digit_font_size, egui::FontFamily::Monospace),
+                                        egui::Color32::WHITE,
+                                    );
+                                }
+                            } else {
+                                for y in 0..3 {
+                                    for x in 0..3 {
+                                        let n = x + y * 3;
+                                        let p = (potential & (1 << n) == (1 << n)) as usize
+                                            * (n + 1);
+                                        let gd = self.grid_dist;
+                                        if p != 0 {
+                                            painter.text(
+                                                rect.center() + egui::vec2( x as f32 * gd - gd, y as f32 * gd - gd),
+                                                egui::Align2::CENTER_CENTER,
+                                                format!("{}", p),
+                                                egui::FontId::new(self.grid_font_size, egui::FontFamily::Monospace),
+                                                egui::Color32::WHITE,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
+                            let popup_id = ui.make_persistent_id(format!("{i}{j}"));
+                            if response.clicked() {
+                                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                            }
+                            let below = egui::AboveOrBelow::Below;
+                            let close_on_click_outside =
+                            egui::popup::PopupCloseBehavior::CloseOnClick;
+                            egui::popup::popup_above_or_below_widget(
+                                ui,
+                                popup_id,
+                                &response,
+                                below,
+                                close_on_click_outside,
+                                |ui| {
+                                    egui::Grid::new("some_unique_id").show(ui, |ui| {
+                                        for n in 0..10 {
+                                            if ui.button(format!("\t{n}\t")).clicked() {
+                                                self.board.lock().unwrap()[i][j] = n;
+                                            }
+                                            if n == 0 { ui.end_row(); continue;}
+                                            if n % 3 == 0 {
+                                                ui.end_row();
+                                            }
+                                        }
+                                    });
+                                },
+                            );
                             if (j + 1) % 3 == 0 && j != 8 {
                                 ui.separator();
                             }
@@ -360,7 +397,8 @@ impl eframe::App for SudokuSolverApp {
                     // Temporarily set a size for the separator and guess the length ratio
                     // it should be
                     if (i + 1) % 3 == 0 && i != 8 {
-                        ui.add_sized([cell_size * 10.85, 0.5], egui::Separator::default());
+                        //ui.add_sized([cell_size * 10.85, 0.5], egui::Separator::default());
+                                ui.separator();
                     }
                 }
             });
