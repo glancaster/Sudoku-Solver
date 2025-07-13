@@ -21,6 +21,8 @@ struct SudokuSolverApp {
     difficulty: String,
     show_potentials: bool,
     potentials: [[u16; 9]; 9],
+    highlight:[[u16;9];9],
+    update_cells: usize,
     // Settings
     cell_size: f32,
     cell_color: egui::Color32,
@@ -151,6 +153,22 @@ impl SudokuSolverApp {
         });
     }
     fn update_potentials(&mut self) {
+        if self.update_cells > 0 {
+            for row in 0..9 {
+                for col in 0..9 {
+                    let h = self.highlight[row][col];
+                    if h > 0 {
+                        for n in 0..9 {
+                            if (h & (1 << n)) == (1 << n) {
+                                self.board.lock().unwrap()[row][col] = n + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.highlight = [[0;9];9];
+        self.update_cells = 0;
         let mut i = 0;
         while i < 81 {
             let row = i / 9 as usize;
@@ -191,6 +209,25 @@ impl SudokuSolverApp {
             i += 1;
         }
         println!("Updated Potentials");
+    }
+    fn naked_singles(&mut self) {
+        for row in 0..9 {
+            for col in 0..9 {
+                if self.board.lock().unwrap()[row][col] == 0 {
+                    let p = self.potentials[row][col];
+                    let mut c = 0;
+                    for i in 0..9 {
+                        c += ((p & ( 1 << i)) as usize > 0) as usize;
+                    }
+                    if c == 1 {
+                        self.highlight[row][col] = p;
+                        //println!("{row}{col} -> {c}");
+                        self.update_cells += 1;
+                    }
+                }
+            }
+        }
+
     }
 }
 
@@ -284,15 +321,24 @@ impl eframe::App for SudokuSolverApp {
             }
             ui.separator();
             ui.checkbox(&mut self.show_potentials, "Show Potentials");
+            ui.horizontal(|ui| {
             if ui.button("Update Potentials").clicked() {
                 self.update_potentials();
             }
+            ui.label(format!(" - {}", self.update_cells));
+            });
             ui.add(egui::DragValue::new(&mut self.cell_size));
             ui.add(egui::DragValue::new(&mut self.grid_dist));
             ui.add(egui::DragValue::new(&mut self.digit_font_size));
             ui.add(egui::DragValue::new(&mut self.grid_font_size));
             
             egui::widgets::color_picker::color_picker_color32(ui, &mut self.cell_color, egui::widgets::color_picker::Alpha::Opaque);  
+        });
+        egui::SidePanel::right("right_panel").show(ctx, |ui| {
+            ui.heading("Strategies");
+            if ui.button("Naked Singles").clicked() {
+                self.naked_singles();
+            }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -316,6 +362,7 @@ impl eframe::App for SudokuSolverApp {
                             let puzzle_digit = self.puzzle[i][j];
                             let solution_digit = self.solution[i][j];
                             let potential = self.potentials[i][j];
+                            let highlight = self.highlight[i][j];
 
                             let rect_size = egui::Vec2::splat(self.cell_size);
                             let (rect, response) = ui.allocate_exact_size(rect_size, egui::Sense::click());
@@ -347,10 +394,22 @@ impl eframe::App for SudokuSolverApp {
                                         let n = x + y * 3;
                                         let p = (potential & (1 << n) == (1 << n)) as usize
                                             * (n + 1);
+                                        let h = (highlight & (1 << n) == (1 << n)) as usize;
                                         let gd = self.grid_dist;
                                         if p != 0 {
+                                            let center_text_pos = rect.center() + egui::vec2( x as f32 * gd - gd, y as f32 * gd - gd);
+                                            if h == 1 {
+                                                let a = center_text_pos + egui::vec2(-6.0, -9.0);
+                                                let b = center_text_pos + egui::vec2(6.0, 9.0);
+                                                let digit_rect = egui::Rect::from_two_pos(a,b);
+                                                painter.rect_filled(
+                                                    digit_rect, 
+                                                    egui::Rounding::same(1),
+                                                    egui::Color32::GREEN,
+                                                );
+                                            }
                                             painter.text(
-                                                rect.center() + egui::vec2( x as f32 * gd - gd, y as f32 * gd - gd),
+                                                center_text_pos,
                                                 egui::Align2::CENTER_CENTER,
                                                 format!("{}", p),
                                                 egui::FontId::new(self.grid_font_size, egui::FontFamily::Monospace),
