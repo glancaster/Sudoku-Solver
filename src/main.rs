@@ -1,3 +1,9 @@
+mod api;
+mod app;
+mod sudoku;
+mod solver;
+use app::App;
+
 use eframe::egui;
 use reqwest::blocking::{Client, get};
 use serde::{Deserialize, Serialize};
@@ -5,12 +11,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() {
-    let native_options = eframe::NativeOptions::default();
-    eframe::run_native(
-        "Sudoku Solver",
-        native_options,
-        Box::new(|cc| Ok(Box::new(SudokuSolverApp::new(cc)))),
-    );
+    iced::application("Sudoku Solver", App::update, App::view)
+        .window_size(iced::Size::new(800.0, 800.0))
+        .subscription(App::subscription)
+        .run();
+    //let native_options = eframe::NativeOptions::default();
+    //eframe::run_native(
+    //    "Sudoku Solver",
+    //    native_options,
+    //    Box::new(|cc| Ok(Box::new(SudokuSolverApp::new(cc)))),
+    //);
 }
 
 #[derive(Default)]
@@ -21,7 +31,7 @@ struct SudokuSolverApp {
     difficulty: String,
     show_potentials: bool,
     potentials: [[u16; 9]; 9],
-    highlight:[[u16;9];9],
+    highlight: [[u16; 9]; 9],
     update_cells: usize,
     // Settings
     cell_size: f32,
@@ -167,7 +177,7 @@ impl SudokuSolverApp {
                 }
             }
         }
-        self.highlight = [[0;9];9];
+        self.highlight = [[0; 9]; 9];
         self.update_cells = 0;
         let mut i = 0;
         while i < 81 {
@@ -217,7 +227,7 @@ impl SudokuSolverApp {
                     let p = self.potentials[row][col];
                     let mut c = 0;
                     for i in 0..9 {
-                        c += ((p & ( 1 << i)) as usize > 0) as usize;
+                        c += ((p & (1 << i)) as usize > 0) as usize;
                     }
                     if c == 1 {
                         self.highlight[row][col] = p;
@@ -227,7 +237,6 @@ impl SudokuSolverApp {
                 }
             }
         }
-
     }
 }
 
@@ -322,17 +331,21 @@ impl eframe::App for SudokuSolverApp {
             ui.separator();
             ui.checkbox(&mut self.show_potentials, "Show Potentials");
             ui.horizontal(|ui| {
-            if ui.button("Update Potentials").clicked() {
-                self.update_potentials();
-            }
-            ui.label(format!(" - {}", self.update_cells));
+                if ui.button("Update Potentials").clicked() {
+                    self.update_potentials();
+                }
+                ui.label(format!(" - {}", self.update_cells));
             });
             ui.add(egui::DragValue::new(&mut self.cell_size));
             ui.add(egui::DragValue::new(&mut self.grid_dist));
             ui.add(egui::DragValue::new(&mut self.digit_font_size));
             ui.add(egui::DragValue::new(&mut self.grid_font_size));
-            
-            egui::widgets::color_picker::color_picker_color32(ui, &mut self.cell_color, egui::widgets::color_picker::Alpha::Opaque);  
+
+            egui::widgets::color_picker::color_picker_color32(
+                ui,
+                &mut self.cell_color,
+                egui::widgets::color_picker::Alpha::Opaque,
+            );
         });
         egui::SidePanel::right("right_panel").show(ctx, |ui| {
             ui.heading("Strategies");
@@ -365,7 +378,8 @@ impl eframe::App for SudokuSolverApp {
                             let highlight = self.highlight[i][j];
 
                             let rect_size = egui::Vec2::splat(self.cell_size);
-                            let (rect, response) = ui.allocate_exact_size(rect_size, egui::Sense::click());
+                            let (rect, response) =
+                                ui.allocate_exact_size(rect_size, egui::Sense::click());
 
                             let painter = ui.painter();
 
@@ -376,7 +390,6 @@ impl eframe::App for SudokuSolverApp {
                                     self.cell_color,
                                     //egui::Color32::from_rgb(50, 100, 150),
                                 );
-
                             }
                             if digit > 0 {
                                 {
@@ -384,7 +397,10 @@ impl eframe::App for SudokuSolverApp {
                                         rect.center(),
                                         egui::Align2::CENTER_CENTER,
                                         format!("{}", digit),
-                                        egui::FontId::new(self.digit_font_size, egui::FontFamily::Monospace),
+                                        egui::FontId::new(
+                                            self.digit_font_size,
+                                            egui::FontFamily::Monospace,
+                                        ),
                                         egui::Color32::WHITE,
                                     );
                                 }
@@ -392,18 +408,22 @@ impl eframe::App for SudokuSolverApp {
                                 for y in 0..3 {
                                     for x in 0..3 {
                                         let n = x + y * 3;
-                                        let p = (potential & (1 << n) == (1 << n)) as usize
-                                            * (n + 1);
+                                        let p =
+                                            (potential & (1 << n) == (1 << n)) as usize * (n + 1);
                                         let h = (highlight & (1 << n) == (1 << n)) as usize;
                                         let gd = self.grid_dist;
                                         if p != 0 {
-                                            let center_text_pos = rect.center() + egui::vec2( x as f32 * gd - gd, y as f32 * gd - gd);
+                                            let center_text_pos = rect.center()
+                                                + egui::vec2(
+                                                    x as f32 * gd - gd,
+                                                    y as f32 * gd - gd,
+                                                );
                                             if h == 1 {
                                                 let a = center_text_pos + egui::vec2(-6.0, -9.0);
                                                 let b = center_text_pos + egui::vec2(6.0, 9.0);
-                                                let digit_rect = egui::Rect::from_two_pos(a,b);
+                                                let digit_rect = egui::Rect::from_two_pos(a, b);
                                                 painter.rect_filled(
-                                                    digit_rect, 
+                                                    digit_rect,
                                                     egui::Rounding::same(1),
                                                     egui::Color32::GREEN,
                                                 );
@@ -412,7 +432,10 @@ impl eframe::App for SudokuSolverApp {
                                                 center_text_pos,
                                                 egui::Align2::CENTER_CENTER,
                                                 format!("{}", p),
-                                                egui::FontId::new(self.grid_font_size, egui::FontFamily::Monospace),
+                                                egui::FontId::new(
+                                                    self.grid_font_size,
+                                                    egui::FontFamily::Monospace,
+                                                ),
                                                 egui::Color32::WHITE,
                                             );
                                         }
@@ -426,7 +449,7 @@ impl eframe::App for SudokuSolverApp {
                             }
                             let below = egui::AboveOrBelow::Below;
                             let close_on_click_outside =
-                            egui::popup::PopupCloseBehavior::CloseOnClick;
+                                egui::popup::PopupCloseBehavior::CloseOnClick;
                             egui::popup::popup_above_or_below_widget(
                                 ui,
                                 popup_id,
@@ -439,7 +462,10 @@ impl eframe::App for SudokuSolverApp {
                                             if ui.button(format!("\t{n}\t")).clicked() {
                                                 self.board.lock().unwrap()[i][j] = n;
                                             }
-                                            if n == 0 { ui.end_row(); continue;}
+                                            if n == 0 {
+                                                ui.end_row();
+                                                continue;
+                                            }
                                             if n % 3 == 0 {
                                                 ui.end_row();
                                             }
@@ -457,7 +483,7 @@ impl eframe::App for SudokuSolverApp {
                     // it should be
                     if (i + 1) % 3 == 0 && i != 8 {
                         //ui.add_sized([cell_size * 10.85, 0.5], egui::Separator::default());
-                                ui.separator();
+                        ui.separator();
                     }
                 }
             });
