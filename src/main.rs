@@ -1,8 +1,11 @@
 mod api;
 mod app;
-mod sudoku;
+mod dapp;
 mod solver;
+mod sudoku;
+mod ui;
 use app::App;
+// use dapp::App;
 
 use eframe::egui;
 use reqwest::blocking::{Client, get};
@@ -11,6 +14,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() {
+    // dioxus::launch(App);
+
     iced::application("Sudoku Solver", App::update, App::view)
         .window_size(iced::Size::new(800.0, 800.0))
         .subscription(App::subscription)
