@@ -59,3 +59,51 @@ impl Sudoku {
         self.difficulty = diff;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_get_board() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1, 2, 3, 4, 5, 6, 7, 8, 9]; 9];
+        sudoku.set_board(board);
+        assert_eq!(sudoku.get_board(), board);
+    }
+    #[test]
+    fn test_set_get_puzzle() {
+        let mut sudoku = Sudoku::new();
+        let puzzle = [[1, 2, 3, 4, 5, 6, 7, 8, 9]; 9];
+        sudoku.set_puzzle(puzzle);
+        assert_eq!(sudoku.get_puzzle(), Some(puzzle));
+    }
+    #[test]
+    fn test_set_get_solution() {
+        let mut sudoku = Sudoku::new();
+        let solution = [[1, 2, 3, 4, 5, 6, 7, 8, 9]; 9];
+        sudoku.set_solution(solution);
+        assert_eq!(sudoku.get_solution(), Some(solution));
+    }
+    #[test]
+    fn test_set_get_difficulty() {
+        let mut sudoku = Sudoku::new();
+        let difficulty = Difficulty::Hard;
+        sudoku.set_difficulty(Some(difficulty.clone()));
+        assert_eq!(sudoku.get_difficulty(), Some(difficulty));
+    }
+    #[test]
+    fn test_clear_board() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1; 9]; 9];
+        let puzzle = [[2; 9]; 9];
+        let solution = [[3; 9]; 9];
+        sudoku.set_board(board);
+        sudoku.set_puzzle(puzzle);
+        sudoku.set_solution(solution);
+        sudoku.clear_board();
+        assert_eq!(sudoku.get_board(), [[0; 9]; 9]);
+        assert_eq!(sudoku.get_puzzle(), None);
+        assert_eq!(sudoku.get_solution(), None);
+    }
+}

@@ -10,6 +10,7 @@ use iced::futures::SinkExt;
 use iced::futures::Stream;
 use iced::stream::try_channel;
 use iced::widget::progress_bar;
+use iced::widget::text::Span;
 use iced::widget::toggler;
 use iced::widget::{Column, Space, Tooltip, button, column, container, row, text, tooltip};
 use iced::{Subscription, Task, window};
@@ -154,7 +155,11 @@ impl App {
             toggler(self.view_solution)
                 .label("View Solution")
                 .on_toggle(Message::ViewSolution),
-            ui::solution_ui(self.sudoku.get_solution(), width * 0.2 / 9.0)
+            if self.view_solution {
+                ui::solution_ui(self.sudoku.get_solution(), width * 0.2 / 9.0 - 2.0)
+            } else {
+                text("").into()
+            }
         ]
         .spacing(10)
         .padding(5)
@@ -168,7 +173,17 @@ impl App {
             _ => "Select a difficulty to play",
         };
 
-        let board_headers = column![row!["Difficulty:", Space::with_width(20), lbldiff]];
+        let stopwatch_ui = "00:00";
+
+        let board_headers = column![row![
+            "Difficulty:",
+            Space::with_width(20),
+            lbldiff,
+            Space::with_width(50),
+            "Time Spent:",
+            Space::with_width(20),
+            stopwatch_ui
+        ]];
 
         let board = self.sudoku.get_board();
         let puzzle = self.sudoku.get_puzzle();
@@ -188,7 +203,7 @@ impl App {
                         let mut ui_num_row = row![];
                         for i_col in 0..3 {
                             let num = i_row * 3 + i_col + 1;
-                            let mut num_btn = button(text(num).size(num_cell_size * 0.5).center())
+                            let mut num_btn = button(text(num).size(num_cell_size * 0.35).center())
                                 .on_press(Message::SelectedNumber(num))
                                 .height(num_cell_size)
                                 .width(num_cell_size);

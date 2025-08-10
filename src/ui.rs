@@ -14,7 +14,11 @@ pub fn solution_ui(board: Option<[[usize; 9]; 9]>, size: f32) -> Element<'static
             if let Some(value) = board {
                 dis = value[row][col];
             };
-            row_ui = row_ui.push(button(text(format!("{}", dis))).width(size).height(size));
+            row_ui = row_ui.push(
+                button(text(format!("{}", dis)).size(size * 0.35).center())
+                    .width(size)
+                    .height(size),
+            );
         }
         ui = ui.push(row_ui);
     }
