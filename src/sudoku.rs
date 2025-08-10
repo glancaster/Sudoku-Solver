@@ -1,12 +1,16 @@
-use std::sync::{Arc, Mutex};
-
-use crate::solver;
-
 #[derive(Clone)]
 pub struct Sudoku {
+    /// Representation of the sudoku board
+    /// Option not needed since we want to
+    /// display whatever state it is at.
     board: [[usize; 9]; 9],
+    /// Puzzle that we can initially set/reset the board to
     puzzle: Option<[[usize; 9]; 9]>,
+    /// Solution that we can check the board to
+    /// I imagine not all API's or manually setting will supply a solution so we might lean on the
+    /// Sudoku Rules to verify that it is proper solution
     solution: Option<[[usize; 9]; 9]>,
+    /// Optional Enum to track what difficulty the board is at
     difficulty: Option<Difficulty>,
 }
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +62,17 @@ impl Sudoku {
     pub fn set_difficulty(&mut self, diff: Option<Difficulty>) {
         self.difficulty = diff;
     }
+    pub fn reset(&mut self) {
+        if let Some(puzzle) = self.puzzle {
+            self.board = puzzle;
+        }
+    }
+    pub fn won(&self) -> bool {
+        if let Some(solution) = self.solution {
+            return solution == self.board;
+        }
+        false
+    }
 }
 
 #[cfg(test)]
@@ -105,5 +120,51 @@ mod tests {
         assert_eq!(sudoku.get_board(), [[0; 9]; 9]);
         assert_eq!(sudoku.get_puzzle(), None);
         assert_eq!(sudoku.get_solution(), None);
+    }
+    #[test]
+    fn test_update_cell() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1; 9]; 9];
+        sudoku.set_board(board);
+        sudoku.update_cell(0, 0, 2);
+        let updated_board = [
+            [2, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+        assert_eq!(sudoku.get_board(), updated_board);
+    }
+    #[test]
+    fn test_reset_with_puzzle() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1; 9]; 9];
+        let puzzle = [[2; 9]; 9];
+        sudoku.set_board(board);
+        sudoku.set_puzzle(puzzle);
+        sudoku.reset();
+        assert_eq!(sudoku.get_board(), puzzle);
+    }
+    #[test]
+    fn test_reset_without_puzzle() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1; 9]; 9];
+        sudoku.set_board(board);
+        sudoku.reset();
+        assert_eq!(sudoku.get_board(), board);
+    }
+    #[test]
+    fn test_won_with_solution() {
+        let mut sudoku = Sudoku::new();
+        let board = [[1; 9]; 9];
+        let solution = [[1; 9]; 9];
+        sudoku.set_board(board);
+        sudoku.set_solution(solution);
+        assert_eq!(sudoku.won(), true);
     }
 }

@@ -6,6 +6,7 @@ use crate::solver;
 use crate::sudoku::{Difficulty, Sudoku};
 use crate::ui;
 
+use iced::Theme;
 use iced::futures::SinkExt;
 use iced::futures::Stream;
 use iced::stream::try_channel;
@@ -31,6 +32,7 @@ pub enum Message {
     SelectedDifficulty(Difficulty),
     SetBoard([[usize; 9]; 9]),
     ClearBoard,
+    ResetBoard,
     // Solvers
     BruteForce,
     // Internals
@@ -89,6 +91,10 @@ impl App {
             }
             Message::ClearBoard => {
                 self.sudoku.clear_board();
+                Task::none()
+            }
+            Message::ResetBoard => {
+                self.sudoku.reset();
                 Task::none()
             }
             // Solvers
@@ -152,6 +158,7 @@ impl App {
             "Select Level",
             difficulty_row.spacing(5).wrap(),
             button("Clear").on_press(Message::ClearBoard),
+            button("Reset").on_press(Message::ResetBoard),
             toggler(self.view_solution)
                 .label("View Solution")
                 .on_toggle(Message::ViewSolution),
@@ -191,6 +198,10 @@ impl App {
         let cell_height = height / 9.0;
         let cell_size = cell_height.min(cell_width);
         //println!("{} ; {}", width, height);
+
+        if self.sudoku.won() {
+            println!("WON");
+        }
 
         let mut ui_col = column![];
         for row in 0..9 {
